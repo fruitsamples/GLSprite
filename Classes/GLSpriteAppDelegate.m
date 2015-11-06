@@ -4,7 +4,7 @@ File: GLSpriteAppDelegate.m
 Abstract: The UIApplication  delegate class which is  the central controller of
 the application.
 
-Version: 1.7
+Version: 1.8
 
 Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple Inc.
 ("Apple") in consideration of your agreement to the following terms, and your
@@ -42,7 +42,7 @@ DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF
 CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF
 APPLE HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Copyright (C) 2008 Apple Inc. All Rights Reserved.
+Copyright (C) 2009 Apple Inc. All Rights Reserved.
 
 */
 
@@ -53,35 +53,31 @@ Copyright (C) 2008 Apple Inc. All Rights Reserved.
 
 @synthesize window;
 
-// Sets up the frame rate and starts animating the sprite.
-- (void)applicationDidFinishLaunching:(UIApplication *)application {
-	//application = application;
-	// Look in the Info.plist file and you'll see the status bar is hidden
-	// Set the style to black so it matches the background of the application
-	[application setStatusBarStyle:UIStatusBarStyleBlackTranslucent animated:NO];
-	// Now show the status bar, but animate to the style.
-	[application setStatusBarHidden:NO animated:YES];
-	glView.animationInterval = 1.0 / 60.0;
+- (void)applicationDidFinishLaunching:(UIApplication *)application
+{
 	[glView startAnimation];
 }
 
-
-// Changes the frame rate when the application is about to be inactive.
-- (void)applicationWillResignActive:(UIApplication *)application {
-	NSLog(@"applicationWillResignActive:");
-	glView.animationInterval = 1.0 / 5.0;
-}
-
-// Resumes the initial frame rate when the application becomes active.
-- (void)applicationDidBecomeActive:(UIApplication *)application {
-	NSLog(@"applicationDidBecomeActive:");
-	glView.animationInterval = 1.0 / 60.0;
-}
-
-// Stops the animation and then releases the window resource.
-- (void)dealloc {
+- (void) applicationWillResignActive:(UIApplication *)application
+{
 	[glView stopAnimation];
+}
+
+- (void) applicationDidBecomeActive:(UIApplication *)application
+{
+	[glView startAnimation];
+}
+
+- (void)applicationWillTerminate:(UIApplication *)application
+{
+	[glView stopAnimation];
+}
+
+- (void) dealloc
+{
 	[window release];
+	[glView release];
+	
 	[super dealloc];
 }
 

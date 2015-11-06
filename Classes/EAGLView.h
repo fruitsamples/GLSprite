@@ -6,7 +6,7 @@ UIView subclass. The view content is basically an EAGL surface you render your
 OpenGL scene into.  Note that setting the view non-opaque will only work if the
 EAGL surface has an alpha channel.
 
-Version: 1.7
+Version: 1.8
 
 Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple Inc.
 ("Apple") in consideration of your agreement to the following terms, and your
@@ -44,7 +44,7 @@ DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF
 CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF
 APPLE HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Copyright (C) 2008 Apple Inc. All Rights Reserved.
+Copyright (C) 2009 Apple Inc. All Rights Reserved.
 
 */
 
@@ -72,14 +72,22 @@ Copyright (C) 2008 Apple Inc. All Rights Reserved.
 	/* OpenGL name for the sprite texture */
 	GLuint spriteTexture;
 	
-	NSTimer *animationTimer;
-	NSTimeInterval animationInterval;
+	BOOL animating;
+	BOOL displayLinkSupported;
+	NSInteger animationFrameInterval;
+	// Use of the CADisplayLink class is the preferred method for controlling your animation timing.
+	// CADisplayLink will link to the main display and fire every vsync when added to a given run-loop.
+	// The NSTimer class is used only as fallback when running on a pre 3.1 device where CADisplayLink
+	// isn't available.
+	id displayLink;
+    NSTimer *animationTimer;	
 }
+
+@property (readonly, nonatomic, getter=isAnimating) BOOL animating;
+@property (nonatomic) NSInteger animationFrameInterval;
 
 - (void)startAnimation;
 - (void)stopAnimation;
 - (void)drawView;
-
-@property NSTimeInterval animationInterval;
 
 @end

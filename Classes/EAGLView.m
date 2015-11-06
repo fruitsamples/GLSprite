@@ -6,7 +6,7 @@ UIView subclass. The view content is basically an EAGL surface you render your
 OpenGL scene into.  Note that setting the view non-opaque will only work if the
 EAGL surface has an alpha channel.
 
-Version: 1.7
+Version: 1.8
 
 Disclaimer: IMPORTANT:  This Apple software is supplied to you by Apple Inc.
 ("Apple") in consideration of your agreement to the following terms, and your
@@ -44,7 +44,7 @@ DISTRIBUTION OF THE APPLE SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF
 CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF
 APPLE HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Copyright (C) 2008 Apple Inc. All Rights Reserved.
+Copyright (C) 2009 Apple Inc. All Rights Reserved.
 
 */
 
@@ -68,7 +68,8 @@ Copyright (C) 2008 Apple Inc. All Rights Reserved.
 
 @implementation EAGLView
 
-@synthesize animationInterval;
+@synthesize animating;
+@dynamic animationFrameInterval;
 
 // You must implement this
 + (Class) layerClass
@@ -95,7 +96,18 @@ Copyright (C) 2008 Apple Inc. All Rights Reserved.
 			return nil;
 		}
 		
-		animationInterval = 1.0 / 60.0;
+		animating = FALSE;
+		displayLinkSupported = FALSE;
+		animationFrameInterval = 1;
+		displayLink = nil;
+		animationTimer = nil;
+		
+		// A system version of 3.1 or greater is required to use CADisplayLink. The NSTimer
+		// class is used as fallback when it isn't available.
+		NSString *reqSysVer = @"3.1";
+		NSString *currSysVer = [[UIDevice currentDevice] systemVersion];
+		if ([currSysVer compare:reqSysVer options:NSNumericSearch] != NSOrderedAscending)
+			displayLinkSupported = TRUE;
 		
 		[self setupView];
 		[self drawView];
@@ -150,26 +162,68 @@ Copyright (C) 2008 Apple Inc. All Rights Reserved.
 }
 
 
-- (void)startAnimation
+- (NSInteger) animationFrameInterval
 {
-	animationTimer = [NSTimer scheduledTimerWithTimeInterval:animationInterval target:self selector:@selector(drawView) userInfo:nil repeats:YES];
+	return animationFrameInterval;
 }
 
+- (void) setAnimationFrameInterval:(NSInteger)frameInterval
+{
+	// Frame interval defines how many display frames must pass between each time the
+	// display link fires. The display link will only fire 30 times a second when the
+	// frame internal is two on a display that refreshes 60 times a second. The default
+	// frame interval setting of one will fire 60 times a second when the display refreshes
+	// at 60 times a second. A frame interval setting of less than one results in undefined
+	// behavior.
+	if (frameInterval >= 1)
+	{
+		animationFrameInterval = frameInterval;
+		
+		if (animating)
+		{
+			[self stopAnimation];
+			[self startAnimation];
+		}
+	}
+}
+
+- (void) startAnimation
+{
+	if (!animating)
+	{
+		if (displayLinkSupported)
+		{
+			// CADisplayLink is API new to iPhone SDK 3.1. Compiling against earlier versions will result in a warning, but can be dismissed
+			// if the system version runtime check for CADisplayLink exists in -initWithCoder:. The runtime check ensures this code will
+			// not be called in system versions earlier than 3.1.
+			
+			displayLink = [NSClassFromString(@"CADisplayLink") displayLinkWithTarget:self selector:@selector(drawView)];
+			[displayLink setFrameInterval:animationFrameInterval];
+			[displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
+		}
+		else
+			animationTimer = [NSTimer scheduledTimerWithTimeInterval:(NSTimeInterval)((1.0 / 60.0) * animationFrameInterval) target:self selector:@selector(drawView) userInfo:nil repeats:TRUE];
+		
+		animating = TRUE;
+	}
+}
 
 - (void)stopAnimation
 {
-	[animationTimer invalidate];
-	animationTimer = nil;
-}
-
-
-- (void)setAnimationInterval:(NSTimeInterval)interval
-{
-	animationInterval = interval;
-	
-	if(animationTimer) {
-		[self stopAnimation];
-		[self startAnimation];
+	if (animating)
+	{
+		if (displayLinkSupported)
+		{
+			[displayLink invalidate];
+			displayLink = nil;
+		}
+		else
+		{
+			[animationTimer invalidate];
+			animationTimer = nil;
+		}
+		
+		animating = FALSE;
 	}
 }
 
@@ -223,8 +277,8 @@ const GLshort spriteTexcoords[] = {
 
 	if(spriteImage) {
 		// Allocated memory needed for the bitmap context
-		spriteData = (GLubyte *) malloc(width * height * 4);
-		// Uses the bitmatp creation function provided by the Core Graphics framework. 
+		spriteData = (GLubyte *) calloc(width * height * 4, sizeof(GLubyte));
+		// Uses the bitmap creation function provided by the Core Graphics framework. 
 		spriteContext = CGBitmapContextCreate(spriteData, width, height, 8, width * 4, CGImageGetColorSpace(spriteImage), kCGImageAlphaPremultipliedLast);
 		// After you create the context, you can draw the sprite image to the context.
 		CGContextDrawImage(spriteContext, CGRectMake(0.0, 0.0, (CGFloat)width, (CGFloat)height), spriteImage);
@@ -235,13 +289,12 @@ const GLshort spriteTexcoords[] = {
 		glGenTextures(1, &spriteTexture);
 		// Bind the texture name. 
 		glBindTexture(GL_TEXTURE_2D, spriteTexture);
-		// Speidfy a 2D texture image, provideing the a pointer to the image data in memory
+		// Set the texture parameters to use a minifying filter and a linear filer (weighted average)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		// Specify a 2D texture image, providing the a pointer to the image data in memory
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, spriteData);
 		// Release the image data
 		free(spriteData);
-		
-		// Set the texture parameters to use a minifying filter and a linear filer (weighted average)
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		
 		// Enable use of the texture
 		glEnable(GL_TEXTURE_2D);
@@ -268,11 +321,9 @@ const GLshort spriteTexcoords[] = {
 	[context presentRenderbuffer:GL_RENDERBUFFER_OES];
 }
 
-// Stop animating and release resources when they are no longer needed.
+// Release resources when they are no longer needed.
 - (void)dealloc
 {
-	[self stopAnimation];
-	
 	if([EAGLContext currentContext] == context) {
 		[EAGLContext setCurrentContext:nil];
 	}
