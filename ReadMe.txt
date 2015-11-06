@@ -8,12 +8,12 @@ The GLSprite sample application shows how to create a texture from an image. By 
 ================================================================================
 BUILD REQUIREMENTS:
 
-iPhone SDK 3.1 and later
+iOS 4.0 SDK
 
 ================================================================================
 RUNTIME REQUIREMENTS:
 
-iPhone OS 3.1 and later
+iOS 3.2 or later
 
 ================================================================================
 PACKAGING LIST:
@@ -31,6 +31,9 @@ The main entry point for the GLSprite application.
 
 ================================================================================
 CHANGES FROM PREVIOUS VERSIONS:
+
+Version 1.9
+Upgraded project to build with the iOS 4.0 SDK
 
 Version 1.8
 Updated for iPhone OS 3.1:
